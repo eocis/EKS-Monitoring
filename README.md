@@ -1,7 +1,7 @@
 > ## Kubernetes Cluster Resource Monitoring(Prometheus & Grafana)
 
-> ### About.
-- Cluster 내부의 자원에대한 모니터링 및 Slack 알림 발송을 위한 모델을 구축합니다.
+- About.
+    + Cluster 내부의 자원에대한 모니터링 및 Slack 알림 발송을 위한 모델을 구축합니다.
 ---
 
 > ## 전체 구조
@@ -171,3 +171,23 @@ $ kubectl apply -f stage/k8s/prometheus.yaml,stage/k8s/grafana_secret.yaml,stage
     [Install]
     WantedBy=multi-user.target
     ```
+
+> ### 추가 참고사항
+- Kubernetes Container use S3: 별도의 AWS Configure 설정없이 S3에 접근 가능한 방법입니다.
+![image s3](./src/pod_s3.png)
+
+```yaml
+# 확인
+apiVersion: v1
+kind: Pod
+metadata:
+  name: s3-test
+  namespace: <namespace>
+spec:
+  serviceAccountName: <serviceaccount>
+  Containers:
+  - image: amazon/aws-cli
+    name: my-aws-cli
+    command: ['aws', 's3', 'ls', 's3://cluster-s3/']
+status: {}
+```
