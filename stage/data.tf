@@ -18,5 +18,5 @@ data "aws_eks_cluster_auth" "eks" {
 }
 
 data "aws_acm_certificate" "cert_arn" {
-  domain   = "${var.domain}"
+  domain   = "${var.domains}"
 }

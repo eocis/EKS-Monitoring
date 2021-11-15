@@ -68,3 +68,8 @@ variable "node_group_min_capacity" {
     type = number
     default = 2
 }
+
+variable "domains" {
+    type = string
+    default = "eocis.com"
+}

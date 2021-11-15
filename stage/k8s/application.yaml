@@ -1,0 +1,70 @@
+# APP
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-example
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: kube-example
+  name: web-app
+spec:
+  selector:
+    matchLabels:
+      app: web-app
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+      - image: alexwhen/docker-2048
+        imagePullPolicy: Always
+        name: web-app-container
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: kube-example
+  name: web-app-np
+spec:
+  type: NodePort
+  ports:
+    - port: 443
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app: web-app
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: kube-example
+  name: web-app-ing
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/inbound-cidrs: '0.0.0.0/0'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/subnets: "subnet-0e2f98ad7d0f28120,subnet-09d888d6154c7d684"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:418126497077:certificate/94d6ed71-e4d8-4e65-97fa-d9de693147f5
+spec:
+  rules:
+    - host: kube.eocis.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: web-app-np
+                port: 
+                  number: 443

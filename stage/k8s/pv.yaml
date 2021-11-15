@@ -1,0 +1,38 @@
+# AWS EFS를 Persistent Volume으로 사용(CSIDriver)
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: efs
+  namespace: monitoring
+spec:
+  attachRequired: false
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: efs-pv
+  namespace: monitoring
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: efs-sc
+  csi:
+    driver: efs
+    volumeHandle: fs-04bcb8cd5500f756d  # EFS ID
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
