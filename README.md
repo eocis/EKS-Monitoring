@@ -191,3 +191,8 @@ spec:
     command: ['aws', 's3', 'ls', 's3://cluster-s3/']
 status: {}
 ```
+
+---
+
+<참고>
+Prometheus Config: https://prometheus.io/docs/prometheus/latest/configuration/configuration

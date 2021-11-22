@@ -23,6 +23,8 @@ spec:
           items:
           - key: datasource.yaml
             path: provisioning/datasources/datasource.yaml
+          - key: notifiers.yaml
+            path: provisioning/notifiers/notifiers.yaml
           - key: dashboard.json
             path: dashboard.json
       containers:
@@ -42,10 +44,22 @@ spec:
             secretKeyRef:
               name: grafana-secret
               key: password
+        # Grafana Report Setting(Image Render)
+        # - name: GF_RENDERING_MODE
+        #   value: clustered
+        # - name: GF_RENDERING_CLUSTERING_MODE
+        #   value: browser
+        # - name: GF_RENDERING_CLUSTERING_MAX_CONCURRENCY
+        #   value: 5
+        - name: GF_FEATURE_TOGGLES_ENABLE
+          value: " accesscontrol"
         - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH # 지정 Dashboard 사용
           value: /app/data/dashboard.json
         - name: GF_PATHS_PROVISIONING # 지정 Datasource(Prometheus) 사용
           value: /app/data/provisioning
+        volumeMounts:
+          - name: grafana-config-volume
+            mountPath: /app/data
       #   volumeMounts: # PV 사용시 적용 코드
       #   - name: efs
       #     mountPath: /app/data
@@ -146,6 +160,21 @@ metadata:
   labels:
     grafana_datasource: "1"
 data:
+  notifiers.yaml: |+
+    apiVersion: 1
+    notifiers:
+      - name: notification-channel-1
+        type: slack
+        uid: notifier1
+        is_default: true
+        send_reminder: true
+        frequency: 1h
+        disable_resolve_message: false
+        settings:
+          recipient: '#alert-manager'
+          username: 'EKS Alert'
+          uploadImage: true
+          url: 'https://hooks.slack.com/services/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'
   datasource.yaml: |+
     apiVersion: 1
     datasources:
@@ -182,7 +211,7 @@ data:
       "gnetId": 315,
       "graphTooltip": 0,
       "id": 1,
-      "iteration": 1636943616930,
+      "iteration": 1636962839685,
       "links": [],
       "liveNow": true,
       "panels": [
@@ -254,13 +283,14 @@ data:
           "targets": [
             {
               "exemplar": true,
-              "expr": "kube_namespace_labels{namespace=\"kube-example\"}",
+              "expr": "kube_namespace_labels{namespace!=\"default\"} and\nkube_namespace_labels{namespace!=\"kube-node-lease\"} and\nkube_namespace_labels{namespace!=\"kube-public\"} and\nkube_namespace_labels{namespace!=\"kube-system\"} and\nkube_namespace_labels{namespace!=\"monitoring\"}",
+              "instant": true,
               "interval": "",
               "legendFormat": "{{namespace}}",
               "refId": "A"
             }
           ],
-          "title": "NameSpace Status",
+          "title": "Active NameSpaces",
           "type": "stat"
         },
         {
@@ -321,13 +351,14 @@ data:
           "targets": [
             {
               "exemplar": true,
-              "expr": "kube_pod_container_status_ready{container=\"web-app-container\"}",
+              "expr": "kube_pod_container_status_ready{namespace!=\"default\"} and \n kube_pod_container_status_ready{namespace!=\"kube-system\"} and \n kube_pod_container_status_ready{namespace!=\"kube-public\"} and \n kube_pod_container_status_ready{namespace!=\"monitoring\"}",
+              "instant": true,
               "interval": "",
               "legendFormat": "{{container}}({{pod}})",
               "refId": "A"
             }
           ],
-          "title": "Pod Status (NS: kube-example)",
+          "title": "Running Pods",
           "transparent": true,
           "type": "stat"
         },

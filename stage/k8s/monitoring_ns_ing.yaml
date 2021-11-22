@@ -1,3 +1,10 @@
+---
+# Prometheus NameSpace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
 # Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -11,7 +18,7 @@ metadata:
     alb.ingress.kubernetes.io/inbound-cidrs: '0.0.0.0/0'
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
-    alb.ingress.kubernetes.io/subnets: "subnet-09d888d6154c7d684,subnet-0e2f98ad7d0f28120"
+    alb.ingress.kubernetes.io/subnets: "subnet-0d6d1582531132484,subnet-0527055716645001c"
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:418126497077:certificate/94d6ed71-e4d8-4e65-97fa-d9de693147f5
 spec:
   rules:
@@ -22,6 +29,6 @@ spec:
             path: /
             backend:
               service:
-                name: grafana
+                name: prometheus-service
                 port:
-                  number: 443
+                  number: 8080
