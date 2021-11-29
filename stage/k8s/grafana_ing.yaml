@@ -1,0 +1,34 @@
+---
+# Prometheus NameSpace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: monitoring
+  name: grafana-ing
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/inbound-cidrs: '0.0.0.0/0'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/subnets: "subnet-0d6d1582531132484,subnet-0527055716645001c"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:418126497077:certificate/94d6ed71-e4d8-4e65-97fa-d9de693147f5
+spec:
+  rules:
+    - host: grafana.eocis.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 443

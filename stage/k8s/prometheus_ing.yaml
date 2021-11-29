@@ -1,3 +1,4 @@
+# 해당 Ingress는 Metric 리스트 및 Alert 테스트를 위한 Ingress입니다.
 ---
 # Prometheus NameSpace
 apiVersion: v1
@@ -10,7 +11,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   namespace: monitoring
-  name: monitoring-ing
+  name: prometheus-ing
   annotations:
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -22,7 +23,7 @@ metadata:
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:418126497077:certificate/94d6ed71-e4d8-4e65-97fa-d9de693147f5
 spec:
   rules:
-    - host: grafana.eocis.com
+    - host: prometheus.eocis.com
       http:
         paths:
           - pathType: Prefix
@@ -32,3 +33,4 @@ spec:
                 name: prometheus-service
                 port:
                   number: 8080
+

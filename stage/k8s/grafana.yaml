@@ -23,8 +23,8 @@ spec:
           items:
           - key: datasource.yaml
             path: provisioning/datasources/datasource.yaml
-          - key: notifiers.yaml
-            path: provisioning/notifiers/notifiers.yaml
+          # - key: notifiers.yaml
+          #   path: provisioning/notifiers/notifiers.yaml
           - key: dashboard.json
             path: dashboard.json
       containers:
@@ -160,21 +160,21 @@ metadata:
   labels:
     grafana_datasource: "1"
 data:
-  notifiers.yaml: |+
-    apiVersion: 1
-    notifiers:
-      - name: notification-channel-1
-        type: slack
-        uid: notifier1
-        is_default: true
-        send_reminder: true
-        frequency: 1h
-        disable_resolve_message: false
-        settings:
-          recipient: '#alert-manager'
-          username: 'EKS Alert'
-          uploadImage: true
-          url: 'https://hooks.slack.com/services/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'
+  # notifiers.yaml: |+
+  #   apiVersion: 1
+  #   notifiers:
+  #     - name: notification-channel-1
+  #       type: slack
+  #       uid: notifier1
+  #       is_default: true
+  #       send_reminder: true
+  #       frequency: 1h
+  #       disable_resolve_message: false
+  #       settings:
+  #         recipient: '#alert-manager'
+  #         username: 'EKS Alert'
+  #         uploadImage: true
+  #         url: 'https://hooks.slack.com/services/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'
   datasource.yaml: |+
     apiVersion: 1
     datasources:

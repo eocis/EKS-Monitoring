@@ -47,30 +47,50 @@ metadata:
 data:
   prometheus.rules: |-  # 수집 지표에 대한 알람 조건 지정 및 AlertManager로 알람 전송
     groups:
-    - name: Status Alert(Pod)
+    - name: Node Status Alert
       rules:
-      - alert: Pod Status
-        expr: avg(kube_pod_container_status_ready{namespace!="default"} and kube_pod_container_status_ready{namespace!="kube-system"} and kube_pod_container_status_ready{namespace!="kube-public"} and kube_pod_container_status_ready{namespace!="monitoring"}) < 1
-        for: 1m
+      - alert: Node Status Alert!
+        expr: kube_node_status_condition{condition="Ready",status="false"} == 1 or kube_node_status_condition{condition="Ready",status="unknown"} == 1
+        for: 1s
         labels:
-          severity: 'critical'
+          serverity: critical
+          record: 
         annotations:
-          summary: "Pod Dead"
-          description: "Pod Dead"
-  prometheus.yml: |-  # 수집할 Metric의 종류와 수집 주기 정의
-    global:
-      scrape_interval: 5s # 스크래핑 주기
-      scrape_timeout: 5s # 스크래핑 요청 초과시간(=<scrape_interval)
-      evaluation_interval: 5s # 규칙 평가 빈도
-    rule_files:
-      - /etc/prometheus/prometheus.rules  # rule_file은 glob 목록을 지정하며 규칙 및 경고를 읽습니다.
+          title: '[{{ $labels.serverity }}]Node Status Alert!'
+          text: |
 
+            Node = {{$labels.node}}
+            Status = {{$labels.satus}}
+    - name: Pod Terminate Alert!
+      rules:
+      - alert: Pod Terminate Alert!
+        expr: kube_pod_container_status_terminated{pod=~"web-app(.+)"} == 1
+        for: 1s
+        labels:
+          serverity: critical
+          instance: 
+        annotations:
+          title: |
+            '(web-app)Pod Terminated Alert!'
+
+          text: |
+
+            Time: {{ with query "time()" }}{{ . | first | value | humanizeTimestamp }}{{ end }}
+            Container = {{ $labels.container }}
+            Pod = {{ $labels.pod }}
+            Namespace = {{ $labels.namespace }}
+  prometheus.yml: |-  # 수집할 Metric의 종류와 수집 주기 정의, (PrometheusRule 커스텀 리소스를 사용해도 되지만 정적 파일 수정)
+    global:
+      scrape_interval: 1s # 스크래핑 주기
+      scrape_timeout: 1s # 스크래핑 요청 초과시간(=<scrape_interval)
+      evaluation_interval: 1s # 규칙 평가 빈도
+    rule_files: # 규칙을 로딩하고 evaluation_interval 설정에 따라 정기적으로 평가함
+      - /etc/prometheus/prometheus.rules  # rule_file은 glob 목록을 지정하며 규칙 및 경고를 읽습니다.
     alerting:   # Alert 설정
       alertmanagers:
       - scheme: http
         static_configs:
-          - targets:
-            - "alertmanager.monitoring.svc:9093"
+          - targets: ["prometheus-alert-service.monitoring.svc:9093"] # Alertmanager
 
     scrape_configs:
 
@@ -96,6 +116,10 @@ data:
 
         kubernetes_sd_configs:
         - role: node
+
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
 
         relabel_configs:
         - action: labelmap  # 레이블 이름과 일치 시킨 후 레이블의 값을 복사하여 해당 값으로 대체된 일치 그룹참조
@@ -133,6 +157,9 @@ data:
         - source_labels: [__meta_kubernetes_pod_name]
           action: replace
           target_label: kubernetes_pod_name
+        - source_labels: [__meta_kubernetes_pod_node_name] # 해당 Pod의 Node 확인
+          action: replace
+          target_label: kubernetes_pod_node_name
 
       - job_name: 'kubernetes-cadvisor' # 각 노드에 있는 cadvisor데이터 스크래핑
 
@@ -185,7 +212,48 @@ data:
         - source_labels: [__meta_kubernetes_service_name]
           action: replace
           target_label: kubernetes_name
-
+      
+      # - job_name: 'kube-state-metrics'  # kube-state-metrics 스크래핑
+      #   static_configs:
+      #     - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
+---
+# Prometheus AlertManager ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-conf
+  namespace: monitoring
+data:
+  # template.tmpl: |-
+  #   {{ define "custom_slack_title"}}
+  #     Container {{ .Annotations.container }} Dead
+  #   {{ end }}
+  #   {{ define "custom_slack_message"}}
+  #     *Serverity: * {{ .Annotations.serverity }}
+  #     *NS: * {{ .Annotations.namespace }}
+  #     *Container: * {{ .Annotations.container }}
+  #     *Pod: * {{ .Annotations.pod }}
+  #     *Description: * {{ .Annotations.description }}
+  #   {{ end }}
+  alertset.yml: |-
+    global:
+      slack_api_url: "https://hooks.slack.com/services/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"
+    route:
+      group_by: [alertname]
+      group_wait: 1s
+      # repeat_interval: 1d  # 알람 전송 후 재전송 까지의 시간
+      receiver: slack-alert # 전송 대상 설정
+    receivers:
+    - name: 'slack-alert'
+      slack_configs:
+      - send_resolved: false  # 해결된 경고의 알림
+        channel: '#prometheus'
+        username: 'Prometheus'
+        title: "{{ range .Alerts }}{{ .Annotations.title }}{{ end }}"
+        text: "{{ range .Alerts }}{{ .Annotations.text }}{{ end }}"
+        # title: '{{ template "custom_slack_title" }}'
+        # text: '{{ template "custom_slack_message"}}'
+    # templates: ['/data/alertmanager/template.tmpl']
 ---
 # Prometheus Deployment 설정
 apiVersion: apps/v1
@@ -204,6 +272,7 @@ spec:
         app: prometheus-server
     spec:
       containers:
+        # Prometheus Server
         - name: prometheus
           image: prom/prometheus
           args:
@@ -216,13 +285,30 @@ spec:
               mountPath: /etc/prometheus/
             - name: prometheus-storage-volume
               mountPath: /prometheus/
+        # Prometheus Alert
+        - name: prometheus-alert
+          ports:
+            - containerPort: 9093
+          image: prom/alertmanager
+          args:
+            - "--config.file=/data/alertmanager/alertset.yml"
+          volumeMounts:
+            - name: prometheus-alert-config-volume
+              mountPath: /data/alertmanager
       volumes:
+        # Prometheus-server-config
         - name: prometheus-config-volume
           configMap:
             defaultMode: 420
             name: prometheus-server-conf
+        # Prometheus-DB
         - name: prometheus-storage-volume # Prometheus DB를 emptyDir로 설정
           emptyDir: {}
+        # Prometheus-alert-config
+        - name: prometheus-alert-config-volume
+          configMap:
+            defaultMode: 420
+            name: prometheus-alert-conf
 ---
 # Kube State Metrics(ClusterRole)
 apiVersion: rbac.authorization.k8s.io/v1
@@ -239,6 +325,7 @@ rules:
   resources: ["daemonsets", "deployments", "replicasets", "ingresses"]
   verbs: ["list", "watch"]
 - apiGroups:  # Pod 구성
+  - apps
   resources: ["statefulsets", "daemonsets", "deployments", "replicasets"]
   verbs: ["list", "watch"]
 - apiGroups:  # Job 구성
@@ -300,6 +387,7 @@ subjects:
   namespace: kube-system
 ---
 # Kube State Deployment
+# 워커노드의 CPU, MEM, DISK 및 클러스터 내부의 Pod가 사용중인 리소스 매트릭 및 구성 내역 등 수집하는 기능
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -308,7 +396,7 @@ metadata:
   name: kube-state-metrics
   namespace: kube-system
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: kube-state-metrics
@@ -385,24 +473,23 @@ spec:
         - containerPort: 9100
           protocol: TCP
           name: http
-# ---
-# # Node Exporter Service(NodePort)
-# apiVersion: v1
-# kind: Service
-# metadata:
-#   labels:
-#     k8s-app: node-exporter
-#   name: node-exporter
-#   namespace: kube-system
-# spec:
-#   ports:
-#   - name: http
-#     port: 9100
-#     nodePort: 31672
-#     protocol: TCP
-#   type: NodePort
-#   selector:
-#     k8s-app: node-exporter
+---
+# Node Exporter Service(ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: node-exporter
+  name: node-exporter
+  namespace: kube-system
+spec:
+  ports:
+  - name: http
+    port: 9100
+    protocol: TCP
+  type: NodePort
+  selector:
+    k8s-app: node-exporter
 ---
 # Prometheus Service(NordPort)
 apiVersion: v1
@@ -418,5 +505,19 @@ spec:
     app: prometheus-server
   type: NodePort
   ports:
-    - port: 8080  # 8080 포트로 ClusterIP설정
+    - port: 8080  # 8080 포트로 설정
       targetPort: 9090
+---
+# Prometheus Alert Service(NodePort)
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-alert-service
+  namespace: monitoring
+spec:
+  selector:
+    app: prometheus-server
+  type: NodePort
+  ports:
+    - port: 9093
+      targetPort: 9093
