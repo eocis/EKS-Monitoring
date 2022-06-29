@@ -216,6 +216,14 @@ data:
       # - job_name: 'kube-state-metrics'  # kube-state-metrics 스크래핑
       #   static_configs:
       #     - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']
+      
+      - job_name: 'kubernetes-node-exporter'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_endpoints_name]
+          regex: 'node-exporter'
+          action: keep
 ---
 # Prometheus AlertManager ConfigMap
 apiVersion: v1
